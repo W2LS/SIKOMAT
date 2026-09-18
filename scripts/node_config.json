@@ -1,0 +1,33 @@
+{
+    "device_id": "RPI3B_PINDAD_ROOM_1",
+    "room_name": "Ruang Server Utama (Lt. 1)",
+    "location": "Gedung Divisi Mutu & TI",
+    "mqtt_broker_host": "127.0.0.1",
+    "mqtt_broker_port": 1883,
+    "sophos_auth": {
+        "enabled": true,
+        "user": "pin-00020",
+        "pass": "5uiFS4eE",
+        "url": "https://sophostrn.pindad.com:8090/login.xml"
+    },
+    "relays": [
+        {
+            "ac_number": 1,
+            "gpio_pin": 17,
+            "name": "Panasonic 1 (Lampu Bawah)",
+            "adc_channel": 0
+        },
+        {
+            "ac_number": 2,
+            "gpio_pin": 27,
+            "name": "Panasonic 2 (Lampu Atas)",
+            "adc_channel": 1
+        }
+    ],
+    "turbo_cooling_seconds": 300,
+    "telemetry_interval_seconds": 15,
+    "calibration_gain_factor": 1,
+    "hardware_watchdog_enabled": true,
+    "fast_sample_interval_seconds": 2,
+    "transmit_delta_threshold": 0.05
+}

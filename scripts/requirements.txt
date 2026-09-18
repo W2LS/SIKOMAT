@@ -1,0 +1,4 @@
+paho-mqtt>=2.0.0
+adafruit-circuitpython-ads1x15>=2.2.0
+adafruit-circuitpython-ds3231>=2.3.0
+RPi.GPIO>=0.7.1
