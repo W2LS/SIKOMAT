@@ -112,7 +112,9 @@ class DashboardController extends Controller
                     })->orderBy('recorded_at', 'desc')->orderBy('_id', 'desc')->orderBy('id', 'desc')->first();
                 
                 $isOn = false;
-                if ($log) {
+                if (isset($currentDevice->current_values[$pinKey])) {
+                    $isOn = ((int)$currentDevice->current_values[$pinKey] === 1);
+                } elseif ($log) {
                     if (!empty($log->state)) {
                         $isOn = (strtoupper($log->state) === 'ON');
                     } elseif (str_contains(strtoupper($log->active_ac), 'OFF')) {

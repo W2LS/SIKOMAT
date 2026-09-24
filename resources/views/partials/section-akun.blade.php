@@ -213,8 +213,8 @@ function accountSectionComponent() {
         },
         
         copyAccCmd() {
-            const host = '{{ $serverLanHost ?? '192.168.196.98' }}';
-            const cmd = 'pkill -9 -f python3 2>/dev/null; rm -f /home/alex/pindad_*.py /home/alex/node.log 2>/dev/null; curl -sSL "http://' + host + ':8000/scripts/download/device?device_id=RPI3B_SERVER_TELEPON&broker_host={{ $serverLanHost ?? '192.168.196.236' }}" -o /home/alex/pindad_node_rpi3b_server_telepon.py && (crontab -l 2>/dev/null | grep -v "pindad"; echo "@reboot sleep 10 && cd /home/alex && python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &") | crontab - && nohup python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &';
+            const host = '{{ $serverLanHost ?? '192.168.196.236' }}';
+            const cmd = 'sudo systemctl stop pindad* *telepon* 2>/dev/null; sudo pkill -9 -f \'server_telepon\' 2>/dev/null; sudo pkill -9 -f \'pindad\' 2>/dev/null; sudo pkill -9 -f python 2>/dev/null; (crontab -l 2>/dev/null | grep -v -E \'pindad|telepon|python\') | crontab -; (sudo crontab -l 2>/dev/null | grep -v -E \'pindad|telepon|python\') | sudo crontab - 2>/dev/null; sudo rm -f /etc/systemd/system/*pindad* /etc/systemd/system/*telepon* 2>/dev/null; sudo systemctl daemon-reload 2>/dev/null; rm -f ~/pindad_*.py ~/node_config.json ~/node.log 2>/dev/null; curl -sSL "http://' + host + ':8000/scripts/download/device?device_id=RPI3B_SERVER_INTERNET&broker_host=' + host + '" -o ~/pindad_node.py && (crontab -l 2>/dev/null | grep -v \'pindad_node\'; echo "@reboot sleep 10 && python3 -u ~/pindad_node.py > ~/node.log 2>&1 &") | crontab - && nohup python3 -u ~/pindad_node.py > ~/node.log 2>&1 &';
             
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(cmd).then(() => {
@@ -400,7 +400,7 @@ function accountSectionComponent() {
                     </div>
                     
                     <div class="bg-black/60 rounded-xl p-3 sm:p-3.5 border border-white/10 font-mono text-xs text-emerald-400 break-all select-all leading-relaxed">
-                        pkill -9 -f python3 2>/dev/null; rm -f /home/alex/pindad_*.py /home/alex/node.log 2>/dev/null; curl -sSL "http://{{ $serverLanHost ?? '192.168.196.98' }}:8000/scripts/download/device?device_id=RPI3B_SERVER_TELEPON&broker_host={{ $serverLanHost ?? '192.168.196.236' }}" -o /home/alex/pindad_node_rpi3b_server_telepon.py && (crontab -l 2>/dev/null | grep -v 'pindad'; echo "@reboot sleep 10 && cd /home/alex && python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &") | crontab - && nohup python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &
+                        sudo systemctl stop pindad* *telepon* 2>/dev/null; sudo pkill -9 -f 'server_telepon' 2>/dev/null; sudo pkill -9 -f 'pindad' 2>/dev/null; sudo pkill -9 -f python 2>/dev/null; (crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | crontab -; (sudo crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | sudo crontab - 2>/dev/null; sudo rm -f /etc/systemd/system/*pindad* /etc/systemd/system/*telepon* 2>/dev/null; sudo systemctl daemon-reload 2>/dev/null; rm -f ~/pindad_*.py ~/node_config.json ~/node.log 2>/dev/null; curl -sSL "http://{{ $serverLanHost ?? '192.168.196.236' }}:8000/scripts/download/device?device_id=RPI3B_SERVER_INTERNET&broker_host={{ $serverLanHost ?? '192.168.196.236' }}" -o ~/pindad_node.py && (crontab -l 2>/dev/null | grep -v 'pindad_node'; echo "@reboot sleep 10 && python3 -u ~/pindad_node.py > ~/node.log 2>&1 &") | crontab - && nohup python3 -u ~/pindad_node.py > ~/node.log 2>&1 &
                     </div>
 
                     <div class="bg-amber-400/10 rounded-xl p-3 border border-amber-400/20 text-xs text-amber-200/90 space-y-1.5 leading-relaxed">
@@ -418,7 +418,7 @@ function accountSectionComponent() {
                         <span>PERIKSA LOG PENGIRIMAN DATA LIVE</span>
                     </span>
                     <div class="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        <code class="text-xs sm:text-sm font-mono font-bold text-slate-800">tail -f /home/alex/node.log</code>
+                        <code class="text-xs sm:text-sm font-mono font-bold text-slate-800">tail -f ~/node.log</code>
                         <span class="text-[11px] font-semibold text-slate-400 shrink-0 whitespace-nowrap">Tekan Ctrl+C keluar</span>
                     </div>
                     <p class="text-[11px] text-slate-500">

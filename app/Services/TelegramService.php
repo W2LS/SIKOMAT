@@ -64,7 +64,62 @@ class TelegramService
     }
 
     /**
-     * Send critical emergency failure alert for a specific device and AC unit.
+     * Kirim notifikasi pengingat AC MENYALA (Arus terdeteksi mengalir).
+     */
+    public function sendAcOnNotification(
+        string $roomName,
+        string $location,
+        string $deviceId,
+        int $acNumber,
+        string $unitName,
+        float $currentAmpere,
+        string $timestamp
+    ): array {
+        $formattedTime = date('d M Y - H:i:s \W\I\B', strtotime($timestamp ?: 'now'));
+        $watt = round($currentAmpere * 220);
+
+        $msg = "🔔 <b>[PENGINGAT AC • PT PINDAD]</b>\n";
+        $msg .= "🟢 <b>STATUS: AC MENYALA</b>\n\n";
+        $msg .= "📍 <b>Ruangan:</b> <code>{$roomName}</code>\n";
+        $msg .= "🏢 <b>Lokasi:</b> {$location}\n";
+        $msg .= "🆔 <b>ID Perangkat:</b> <code>{$deviceId}</code>\n";
+        $msg .= "❄️ <b>Unit AC:</b> <b>Unit {$acNumber} ({$unitName})</b>\n";
+        $msg .= "⚡ <b>Beban Arus:</b> <code>{$currentAmpere} A</code> (≈ {$watt} Watt)\n";
+        $msg .= "⏰ <b>Waktu:</b> {$formattedTime}\n\n";
+        $msg .= "💡 <i>Arus listrik terdeteksi mengalir, unit pendingin aktif beroperasi normal.</i>";
+
+        return $this->sendMessage($msg);
+    }
+
+    /**
+     * Kirim notifikasi pengingat AC MATI (Tidak ada arus listrik mengalir).
+     */
+    public function sendAcOffNotification(
+        string $roomName,
+        string $location,
+        string $deviceId,
+        int $acNumber,
+        string $unitName,
+        float $currentAmpere,
+        string $timestamp
+    ): array {
+        $formattedTime = date('d M Y - H:i:s \W\I\B', strtotime($timestamp ?: 'now'));
+
+        $msg = "🔔 <b>[PENGINGAT AC • PT PINDAD]</b>\n";
+        $msg .= "🔴 <b>STATUS: AC MATI</b>\n\n";
+        $msg .= "📍 <b>Ruangan:</b> <code>{$roomName}</code>\n";
+        $msg .= "🏢 <b>Lokasi:</b> {$location}\n";
+        $msg .= "🆔 <b>ID Perangkat:</b> <code>{$deviceId}</code>\n";
+        $msg .= "❄️ <b>Unit AC:</b> <b>Unit {$acNumber} ({$unitName})</b>\n";
+        $msg .= "⚡ <b>Beban Arus:</b> <code>0.0000 A</code> (0 Watt)\n";
+        $msg .= "⏰ <b>Waktu:</b> {$formattedTime}\n\n";
+        $msg .= "⚠️ <i>Arus listrik tidak terdeteksi (AC mati / tidak ada beban listrik).</i>";
+
+        return $this->sendMessage($msg);
+    }
+
+    /**
+     * Send critical emergency failure alert for a specific device and AC unit. for a specific device and AC unit.
      */
     public function sendFailureAlert(
         string $roomName,

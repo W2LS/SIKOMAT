@@ -210,6 +210,10 @@ class ProfileSettingsController extends Controller
                 'schedules' => $activeSchedules,
                 'turbo_cooling_seconds' => 0,
                 'telemetry_interval_seconds' => 15,
+                'acs712_model' => '5A',
+                'min_current_threshold' => 0.005,
+                'noise_floor_vrms' => 0.006,
+                'relay_active_low' => true,
             ];
 
             $jsonConfigStr = json_encode($customConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -228,24 +232,31 @@ class ProfileSettingsController extends Controller
             ]);
         }
 
-        if ($type === 'universal_node' || $type === 'node') {
+        if ($type === 'universal_node' || $type === 'node' || $type === 'pindad_universal_node.py') {
             $path = base_path('scripts/pindad_universal_node.py');
             return response()->download($path, 'pindad_universal_node.py', [
                 'Content-Type' => 'text/x-python',
             ]);
         }
 
-        if ($type === 'config' || $type === 'node_config') {
+        if ($type === 'config' || $type === 'node_config' || $type === 'node_config.json') {
             $path = base_path('scripts/node_config.json');
             return response()->download($path, 'node_config.json', [
                 'Content-Type' => 'application/json',
             ]);
         }
 
-        if ($type === 'setup' || $type === 'sh') {
+        if ($type === 'setup' || $type === 'sh' || $type === 'setup.sh' || $type === 'setup_raspberry_pi.sh') {
             $path = base_path('scripts/setup_raspberry_pi.sh');
             return response()->download($path, 'setup_raspberry_pi.sh', [
                 'Content-Type' => 'text/x-sh',
+            ]);
+        }
+
+        if ($type === 'requirements' || $type === 'requirements.txt') {
+            $path = base_path('scripts/requirements.txt');
+            return response()->download($path, 'requirements.txt', [
+                'Content-Type' => 'text/plain',
             ]);
         }
 

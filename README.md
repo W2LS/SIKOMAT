@@ -1,4 +1,4 @@
-# ❄️ SIKOMAT — Sistem Kontrol & Monitoring Otomatis AC
+# ❄️ SIKOMAT — Sistem Informasi Kontrol & Monitoring Otomatis AC
 ### 🏢 PT PINDAD (PERSERO) • Divisi Mutu & Teknologi Informasi
 
 <p align="center">
@@ -6,237 +6,241 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/W2LS/SIKOMAT/releases"><img src="https://img.shields.io/badge/Release-v2.6.0--Production-8E1616?style=for-the-badge&logo=git&logoColor=white" alt="Release Version" /></a>
   <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 12" />
   <img src="https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/Alpine.js-3.x-8BC0D0?style=for-the-badge&logo=alpine.js&logoColor=white" alt="Alpine.js" />
-  <img src="https://img.shields.io/badge/MQTT-Mosquitto_TCP_1883-660066?style=for-the-badge&logo=eclipse-mosquitto&logoColor=white" alt="MQTT Mosquitto" />
-  <img src="https://img.shields.io/badge/Database-MongoDB_Atlas_&_Local-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="Database" />
+  <img src="https://img.shields.io/badge/MQTT-Mosquitto_1883-660066?style=for-the-badge&logo=eclipse-mosquitto&logoColor=white" alt="MQTT Mosquitto" />
+  <img src="https://img.shields.io/badge/Database-MongoDB_&_SQLite-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="Database" />
   <img src="https://img.shields.io/badge/Hardware-Raspberry_Pi_3B+-C51A4A?style=for-the-badge&logo=raspberry-pi&logoColor=white" alt="Raspberry Pi" />
   <img src="https://img.shields.io/badge/Bot-Telegram_Alerts-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Telegram Bot" />
+</p>
+
+<p align="center">
+  <img src="public/dashboard_preview.png" alt="SIKOMAT Dashboard Real-Time Preview" width="850" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);" />
 </p>
 
 ---
 
 ## 📑 Daftar Isi
 1. [Ringkasan Proyek](#-ringkasan-proyek)
-2. [Arsitektur Sistem (Enterprise Multi-Tenancy)](#-arsitektur-sistem-enterprise-multi-tenancy)
-3. [Fitur Utama Platform Web (4 Modul Inti)](#-fitur-utama-platform-web-4-modul-inti)
-4. [Skema Wiring Pinout Hardware (Relay 1 s/d 8 Channel & Sensor)](#-skema-wiring-pinout-hardware-relay-1-sd-8-channel--sensor)
-5. [Panduan Instalasi & Deployment](#-panduan-instalasi--deployment)
-   - [1. Setup Server Web Dashboard (Laptop / Server)](#1-setup-server-web-dashboard-laptop--server)
-   - [2. Setup Raspberry Pi Node Baru (3 Langkah Mudah)](#2-setup-raspberry-pi-node-baru-3-langkah-mudah)
-6. [Fitur Buku Panduan & SOP Teknis Cetak PDF](#-fitur-buku-panduan--sop-teknis-cetak-pdf)
-7. [Protokol Topik MQTT & Struktur Data](#-protokol-topik-mqtt--struktur-data)
+2. [Keunggulan & Fitur Utama](#-keunggulan--fitur-utama)
+3. [Arsitektur Sistem (Enterprise Multi-Tenancy & Edge IoT)](#-arsitektur-sistem-enterprise-multi-tenancy--edge-iot)
+4. [Modul Aplikasi Web SIKOMAT](#-modul-aplikasi-web-sikomat)
+5. [Skema Wiring & Pinout Hardware](#-skema-wiring--pinout-hardware)
+6. [Panduan Instalasi & Deployment](#-panduan-instalasi--deployment)
+   - [Setup Server Web Dashboard](#1-setup-server-web-dashboard-laravel--mqtt)
+   - [Setup Node Raspberry Pi Baru (1-Baris Perintah)](#2-setup-raspberry-pi-node-baru-1-baris-perintah)
+7. [Protokol Komunikasi MQTT](#-protokol-komunikasi-mqtt)
 8. [Struktur Direktori Repositori](#-struktur-direktori-repositori)
-9. [Catatan Rilis & Changelog](#-catatan-rilis--changelog)
+9. [Buku Panduan & SOP Teknis Cetak PDF](#-buku-panduan--sop-teknis-cetak-pdf)
+10. [Catatan Rilis & Changelog](#-catatan-rilis--changelog)
 
 ---
 
 ## 📌 Ringkasan Proyek
-**SIKOMAT (Sistem Kontrol & Monitoring Otomatis AC)** adalah platform Industrial IoT yang dirancang khusus untuk memantau beban arus listrik (Ampere), konsumsi daya (Watt), dan mengotomasi pergantian shift 12 jam pada unit pendingin ruangan (AC) di berbagai fasilitas strategis **PT PINDAD (PERSERO)** secara *real-time*, *fail-safe*, dan terintegrasi dengan alarm darurat bot Telegram.
 
-Platform ini mengadopsi arsitektur **Enterprise Multi-Tenancy & Edge Computing** di mana **1 Template Cetak Biru Hardware** dapat digunakan oleh **banyak perangkat ruangan (*Multi-Device Fleet*)** secara terisolasi tanpa risiko interferensi data atau salah kendali.
+**SIKOMAT (Sistem Informasi Kontrol & Monitoring Otomatis AC)** adalah platform Industrial Internet of Things (IIoT) yang dikembangkan khusus untuk mengotomasi pergantian shift rotasi, pemantauan beban arus listrik riil presisi tinggi, dan pencegahan *overheating* pada unit pendingin ruangan (AC) server strategis di lingkungan **PT PINDAD (PERSERO)**.
+
+Sistem ini menggabungkan **Edge Computing (Raspberry Pi + Hardware RTC DS3231 + ADC ADS1115 + Sensor ACS712)** dengan **Enterprise Central Dashboard (Laravel 12 + MongoDB + Mosquitto MQTT + WebSocket Broadcast)** untuk menjamin pengawasan fasilitas berjalan tanpa henti (24/7) dengan tingkat keandalan militer (*defense-grade reliability*).
 
 ---
 
-## 🏛️ Arsitektur Sistem (Enterprise Multi-Tenancy)
+## 🚀 Keunggulan & Fitur Utama
+
+- ⚡ **True-RMS Physical Current Sensing (Zero Deadband / Zero Dummy):**
+  Menggunakan konversi ADC ADS1115 (16-bit, 860 SPS) dengan perhitungan matematis True-RMS murni tanpa pemotongan batas ambang buatan. Mampu mengukur beban fisik secara transparan mulai dari lampu indikator panel kecil (~15–20 mA) hingga kompresor AC industri berdaya besar.
+- ⏰ **Otomasi Shift Perangkat Keras Mandiri (RTC DS3231):**
+  Otomasi rotasi AC tetap berjalan tepat waktu meskipun koneksi internet terputus, berkat modul RTC hardware baterai internal. Terintegrasi dengan proteksi *anti-flicker* dan prioritas saklar manual pengguna (*manual override retention*).
+- 🔄 **Anti-Mati Mendadak & Stabilitas Saklar:**
+  Penambahan atau penghapusan jadwal tidak akan menyebabkan relai terpicu ulang (*klik-klak*) atau saklar web berkedip sendiri. Jika jadwal aktif dihapus dari dashboard, unit AC yang sedang menyala akan tetap beroperasi dalam mode manual.
+- 📱 **Peringatan Cerdas Bot Telegram:**
+  Notifikasi transisi status dikirim secara instan ke ponsel teknisi ketika AC menyala (*AC MENYALA*) atau mati (*AC MATI*) berbasis keberadaan arus listrik riil.
+- 💾 **Store-and-Forward (Buffer Offline SQLite):**
+  Jika jaringan server terputus, data telemetri disimpan ke antrean lokal di Raspberry Pi dan secara otomatis dikirim kembali (*drained*) saat koneksi pulih tanpa ada data yang hilang.
+- 📋 **Generator Skrip Node Otomatis:**
+  Pendaftaran perangkat baru cukup melalui dashboard, skrip agen Python khusus perangkat dapat diunduh langsung atau diinstal otomatis hanya dengan satu baris perintah `curl`.
+- 📑 **Dokumen SOP Teknis Cetak PDF A4:**
+  Tersedia halaman siap cetak berstandar dokumen kontrol perusahaan lengkap dengan nomor SOP dan lembar pengesahan tanda tangan teknisi.
+
+---
+
+## 🏛️ Arsitektur Sistem (Enterprise Multi-Tenancy & Edge IoT)
 
 ```text
-                                    ┌─────────────────────────────────────────────────────────┐
-                                    │                   CENTRAL MQTT BROKER                   │
-                                    │                (Mosquitto : 127.0.0.1:1883)             │
-                                    └───────────▲─────────────────────────────────▲───────────┘
-                                                │                                 │
-                    Telemetry: pindad/devices/{id}/logs             Command: pindad/devices/{id}/control
-                                                │                                 │
-                ┌────────────────────────────────┴────────┐       ┌────────────────┴────────────────────────┐
-                ▼                                         ▼       ▼                                         ▼
-    ┌──────────────────────┐                  ┌──────────────────────┐                  ┌──────────────────────┐
-    │  NODE RUANG SERVER 1 │                  │  NODE RUANG SERVER 2 │                  │  NODE RUANG LAINNYA  │
-    │  ID: RPI3B_ROOM_1    │                  │  ID: RPI3B_ROOM_2    │                  │  ID: RPI3B_ROOM_X    │
-    │  IP: 192.168.197.64  │                  │  IP: 192.168.197.65  │                  │  IP: 192.168.197.xx  │
-    └───────────┬──────────┘                  └───────────┬──────────┘                  └───────────┬──────────┘
-                │                                         │                                         │
-        [Sensor & Relai]                          [Sensor & Relai]                          [Sensor & Relai]
-        • ACS712 (30A)                            • ACS712 (30A)                            • ACS712 (30A)
-        • ADS1115 ADC (I2C)                       • ADS1115 ADC (I2C)                       • ADS1115 ADC (I2C)
-        • DS3231 RTC (I2C)                        • DS3231 RTC (I2C)                        • DS3231 RTC (I2C)
-        • Relai 1-8 Channel                       • Relai 1-8 Channel                       • Relai 1-8 Channel
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                 PT PINDAD (PERSERO) - SIKOMAT CLOUD / ON-PREM          │
+  │                                                                        │
+  │    ┌──────────────────┐    ┌─────────────────┐    ┌────────────────┐   │
+  │    │  Laravel 12 Web  │◄──►│ Mosquitto Broker│◄──►│ MongoDB Atlas  │   │
+  │    │ (Dashboard/API)  │    │ (TCP Port 1883) │    │ & SQLite DB    │   │
+  │    └────────┬─────────┘    └────────┬────────┘    └────────────────┘   │
+  └─────────────┼───────────────────────┼──────────────────────────────────┘
+                │ HTTP REST / Sync      │ MQTT Telemetry & Commands
+                ▼                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                 EDGE HARDWARE NODE (Raspberry Pi 3B+)                  │
+  │                                                                        │
+  │  ┌──────────────────────────────────────────────────────────────────┐  │
+  │  │ Python 3 Engine (pindad_universal_node.py)                       │  │
+  │  │  - True-RMS Digital Signal Processing (ADS1115 @ 860 SPS)        │  │
+  │  │  - Dual-Sync RTC DS3231 Scheduler (WIB GMT+7)                    │  │
+  │  │  - Local Store-and-Forward SQLite Buffer Queue                   │  │
+  │  └───────────────┬──────────────────────────┬───────────────────────┘  │
+  │                  │ I2C Bus                  │ GPIO Digital Out         │
+  │                  ▼                          ▼                          │
+  │         ┌─────────────────┐        ┌─────────────────┐                 │
+  │         │   ADS1115 ADC   │        │ Relay Aktif Low │                 │
+  │         │   + RTC DS3231  │        │ (1 s/d 8 Ch)    │                 │
+  │         └────────┬────────┘        └────────┬────────┘                 │
+  │                  │                          │                          │
+  │                  ▼                          ▼                          │
+  │         ┌─────────────────┐        ┌─────────────────┐                 │
+  │         │ Sensor ACS712   │        │ Lampu Panel /   │                 │
+  │         │ (5A / 20A / 30A)│        │ Kontaktor AC    │                 │
+  │         └─────────────────┘        └─────────────────┘                 │
+  └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 🔁 Alur Komunikasi Data:
-1. **Telemetry Uplink:** Raspberry Pi membaca arus sensor ACS712 via ADC ADS1115 & status relay, lalu mempublikasikannya secara periodik (5-10 detik) ke broker MQTT dengan identitas `device_id` masing-masing.
-2. **Subscriber Daemon (`php artisan mqtt:subscribe`):** Menerima pesan MQTT dan menyimpannya secara asinkron ke database MongoDB / MySQL (`ac_logs`).
-3. **Web Dashboard:** Melakukan *zero-reload polling* via AJAX (`/api/logs?device_id=...`) untuk memperbarui angka Ampere, Watt, suhu, dan status saklar tanpa me-refresh halaman.
-4. **Downlink Control:** Operator menekan saklar taktil pada web $\rightarrow$ sinyal diteruskan ke topik kontrol spesifik per-device $\rightarrow$ relay Raspberry Pi langsung merespon seketika.
-5. **Anomaly Alert:** Jika AC dijadwalkan ON namun arus terdeteksi `0.00 A` (kompresor macet / MCB trip), sistem otomatis menembakkan pesan darurat ke grup Telegram teknisi.
+---
+
+## 📱 Modul Aplikasi Web SIKOMAT
+
+| Modul | Deskripsi Fungsi |
+| :--- | :--- |
+| **1. Home Dashboard** | Pemantauan kartu AC real-time, toggle saklar manual, beban arus (A), daya (Watt), status shift aktif, dan log event. |
+| **2. DevZone (Templates)** | Konsol perancangan cetak biru (*blueprint*) hardware, pemetaan Virtual Pin (V0–V127), dan manajemen profil sensor. |
+| **3. Log & Audit Trail** | Riwayat telemetri historis, grafik tren konsumsi listrik, filter rentang tanggal, pembersihan log, dan ekspor data ke format CSV. |
+| **4. Akun & Sistem** | Pengaturan bot Telegram, manajemen akun staf (Admin, Operator, Teknisi), dan pengunduhan Buku Panduan PDF SOP resmi. |
 
 ---
 
-## 🚀 Fitur Utama Platform Web (4 Modul Inti)
+## 📟 Skema Wiring & Pinout Hardware
 
-### 📱 Modul 1: Home & Universal IoT Fleet Overview
-* **Fleet Dashboard:** Memantau seluruh ruangan secara bersamaan dengan indikator status koneksi (🟢 *Online* / 🔴 *Offline*).
-* **Drilldown Detail Ruangan:**
-  * **Saklar Taktil IoT (Zero-Reload AJAX):** Saklar ON/OFF animasi fisik (*tactile slider*) yang bergeser instan tanpa kedipan reload.
-  * **Telemetri Arus & Suhu Real-Time:** Ampere presisi 4 desimal, estimasi daya Watt, dan suhu ruangan live.
-  * **Turbo Cooling Priority:** Mode darurat pendinginan ganda saat suhu ruangan server melonjak di atas batas normal.
-  * **Otomasi Shift Shifting:** Penjadwalan rotasi AC otomatis 12 jam berbasis RTC DS3231 anti mati listrik.
-  * **Pendaftaran Perangkat Cepat:** Form pendaftaran node baru dengan validasi IP Address anti-duplikasi.
-  * **Unduh Skrip (.py) Otomatis:** Tombol `📥 Unduh Skrip (.py)` pada kartu ruangan untuk men-generate file Python siap pakai per-device.
-
-### 🛠️ Modul 2: DevZone (PINDAD Hardware Templates & Datastreams Console)
-* **Template Blueprint Manager:** Manajemen cetak biru spesifikasi modul relay (Preset 1 Channel, 2 Channel, 4 Channel, 8 Channel).
-* **Virtual Datastreams Editor:** Konfigurasi Virtual Pin (`V0` - `V3` untuk relay, `V10` suhu, `V20` - `V27` sensor arus, `V30` turbo).
-* **Ekspor & Impor JSON:** Kemudahan backup dan migrasi template ke server lain.
-
-### 📊 Modul 3: Log Telemetri & Audit Trail
-* **Riwayat Telemetri Terperinci:** Pencatatan arus, suhu, status saklar, pemicu (*manual / schedule / boot*), dan timestamp WIB.
-* **Filter Multi-Device & Rentang Tanggal:** Memudahkan pelacakan performa per-ruangan.
-* **Ekspor CSV / Excel:** Unduh laporan telemetri langsung ke spreadsheet untuk audit manajemen.
-
-### ⚙️ Modul 4: Akun Operator & Informasi Sistem
-* **Panduan Praktis Setup Node IoT:** SOP 5 langkah ringkas mulai dari pemilihan template, registrasi node, hingga running di RPi.
-* **Buku Panduan & SOP Teknis Cetak PDF:** Tombol `📥 Unduh PDF Manual` untuk membuka dan mencetak buku SOP resmi format A4 (`/panduan/pdf`).
-* **Notifikasi Alarm Bot Telegram:** Pengaturan Bot Token, Chat ID, Cooldown anti-spam, dan tombol uji coba kirim pesan darurat.
-* **Manajemen Profil & Ubah Password:** Pembaruan kredensial login operator dan administrasi sistem.
-
----
-
-## 📟 Skema Wiring Pinout Hardware (Relay 1 s/d 8 Channel & Sensor)
-
-### 1. Pinout Inti Sensor & I2C Bus:
-| Komponen Sensor / Modul | Pin Modul | Pin Raspberry Pi 3B+ | Keterangan / Fungsi |
+### 1. Jalur Komunikasi I2C (Sensor ADC ADS1115 & RTC DS3231)
+| Komponen Hardware | Pin Modul | Pin Raspberry Pi | Keterangan |
 | :--- | :--- | :--- | :--- |
-| **ADS1115 (ADC 16-Bit)** | `VDD` & `GND` | `Pin 1 (3.3V)` & `Pin 6 (GND)` | Catu daya positif & Common Ground |
-| **ADS1115 (I2C Bus)** | `SDA` & `SCL` | `Pin 3 (GPIO 2)` & `Pin 5 (GPIO 3)` | Alamat I2C: `0x48` • Data & Clock ADC |
-| **DS3231 (RTC Clock)** | `VCC` & `GND` | `Pin 17 (3.3V)` & `Pin 9 (GND)` | Catu daya modul pewaktu presisi |
-| **DS3231 (I2C Bus)** | `SDA` & `SCL` | `Pin 3 (GPIO 2)` & `Pin 5 (GPIO 3)` | Alamat I2C: `0x68` • Paralel dengan ADS1115 |
-| **ACS712 (30A Hall Sensor)** | `VCC` & `GND` | `Pin 2 (5V)` & `Pin 14 (GND)` | Catu daya sensor efek Hall 5V |
-| **Modul Relay Daya 5V** | `VCC` & `GND` | `Pin 4 (5V)` & `Pin 20 (GND)` | Catu daya koil optocoupler 5V |
+| **Semua Modul I2C** | VCC | Pin 1 / 2 (3.3V / 5.0V) | Catu daya modul sensor |
+| **Semua Modul I2C** | GND | Pin 6 / 9 / 14 (GND) | Ground bersama (*common GND*) |
+| **ADS1115 & DS3231** | SDA | Pin 3 (GPIO 2 / SDA) | Jalur Data Serial I2C |
+| **ADS1115 & DS3231** | SCL | Pin 5 (GPIO 3 / SCL) | Jalur Clock Serial I2C |
+| **ACS712 Channel 1** | OUT | ADS1115 Pin A0 | Pembacaan arus AC 1 |
+| **ACS712 Channel 2** | OUT | ADS1115 Pin A1 | Pembacaan arus AC 2 |
 
----
-
-### 2. Pilihan Pin Modul Relay (Skema 1 Channel s/d 8 Channel):
-| Channel Relay | Target Perangkat / Beban | Pin Fisik RPi 3B+ | Nomor BCM GPIO | Channel ADC ACS712 | Virtual Pin Web |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Relay 1 (IN 1)** | Unit AC 1 (Lampu Bawah) | **Pin 11** | `GPIO 17` | `ADS1115 Pin A0` | `V0` (`V20`) |
-| **Relay 2 (IN 2)** | Unit AC 2 (Lampu Atas) | **Pin 13** | `GPIO 27` | `ADS1115 Pin A1` | `V1` (`V21`) |
-| **Relay 3 (IN 3)** | Unit AC 3 / Exhaust 1 | **Pin 15** | `GPIO 22` | `ADS1115 Pin A2` | `V2` (`V22`) |
-| **Relay 4 (IN 4)** | Unit AC 4 / Exhaust 2 | **Pin 16** | `GPIO 23` | `ADS1115 Pin A3` | `V3` (`V23`) |
-| **Relay 5 (IN 5)** | Auxiliary Relay 5 | **Pin 18** | `GPIO 24` | `ADC 2 (0x49 A0)` | `V4` (`V24`) |
-| **Relay 6 (IN 6)** | Auxiliary Relay 6 | **Pin 22** | `GPIO 25` | `ADC 2 (0x49 A1)` | `V5` (`V25`) |
-| **Relay 7 (IN 7)** | Auxiliary Relay 7 | **Pin 29** | `GPIO 5` | `ADC 2 (0x49 A2)` | `V6` (`V26`) |
-| **Relay 8 (IN 8)** | Auxiliary Relay 8 | **Pin 31** | `GPIO 6` | `ADC 2 (0x49 A3)` | `V7` (`V27`) |
-
-> 💡 **Panduan Pemilihan Modul Relay:**
-> * **1 Channel:** Gunakan `Pin 11 (GPIO 17)`.
-> * **2 Channel:** Gunakan `Pin 11 (GPIO 17)` dan `Pin 13 (GPIO 27)`.
-> * **4 Channel:** Gunakan `Pin 11, 13, 15, 16 (GPIO 17, 27, 22, 23)`.
-> * **8 Channel:** Gunakan `Pin 11, 13, 15, 16, 18, 22, 29, 31`.
+### 2. Standar Pinout Modul Relay Industri (Active-Low)
+| Target Unit AC | Pin GPIO Raspberry Pi | Pin Fisik Board | Default Channel ADC |
+| :--- | :--- | :--- | :--- |
+| **AC Unit 1** | **GPIO 17** | Pin 11 | ADC 0 (A0) |
+| **AC Unit 2** | **GPIO 27** | Pin 13 | ADC 1 (A1) |
+| **AC Unit 3** | **GPIO 22** | Pin 15 | ADC 2 (A2) |
+| **AC Unit 4** | **GPIO 23** | Pin 16 | ADC 3 (A3) |
+| **AC Unit 5** | **GPIO 24** | Pin 18 | ADC 0 (A0) |
+| **AC Unit 6** | **GPIO 25** | Pin 22 | ADC 1 (A1) |
+| **AC Unit 7** | **GPIO 5**  | Pin 29 | ADC 2 (A2) |
+| **AC Unit 8** | **GPIO 6**  | Pin 31 | ADC 3 (A3) |
 
 ---
 
 ## 💻 Panduan Instalasi & Deployment
 
-### 1. Setup Server Web Dashboard (Laptop / Server)
-Pastikan PHP 8.2+, Composer, Mosquitto MQTT Broker, dan MongoDB sudah terpasang:
+### 1. Setup Server Web Dashboard (Laravel & MQTT)
+
+Pastikan lingkungan server telah terpasang **PHP 8.2+**, **Composer**, **Mosquitto MQTT**, dan **MongoDB**.
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/W2LS/Sistem_Monitoring_AC.git
-cd Sistem_Monitoring_AC/Dashboard
+# 1. Clone repositori ke server
+git clone https://github.com/W2LS/SIKOMAT.git
+cd SIKOMAT
 
-# 2. Install dependencies PHP
-composer install
+# 2. Instal dependensi PHP via Composer
+composer install --no-dev --optimize-autoloader
 
-# 3. Salin environment & generate key
+# 3. Konfigurasi Environment
 cp .env.example .env
 php artisan key:generate
 
-# 4. Jalankan migrasi & seeder database
-php artisan migrate
-php artisan db:seed
+# 4. Migrasi Database & Seeder Awal
+php artisan migrate --force
+php artisan db:seed --force
 
-# 5. Jalankan server Laravel & background workers
+# 5. Jalankan Web Server & Listener MQTT
+# (Pada server produksi, gunakan Nginx + Supervisor untuk mqtt:subscriber)
 php artisan serve --host=0.0.0.0 --port=8000
-php artisan mqtt:subscribe
-php artisan ac:schedule-worker
+php artisan mqtt:subscriber
 ```
 
 ---
 
-### 2. Setup Raspberry Pi Node Baru (3 Langkah Mudah)
+### 2. Setup Raspberry Pi Node Baru (1-Baris Perintah)
 
-#### Langkah 1: Instalasi Library Python (Khusus Raspberry Pi Baru / 1x Setup)
-Buka terminal SSH Raspberry Pi dan jalankan:
+Setup Raspberry Pi baru dapat dilakukan secara instan tanpa perlu menyalin kode secara manual.
+
+#### Langkah A: Instalasi Library Python (Khusus Raspberry Pi Baru - Cukup 1x)
 ```bash
-pip3 install paho-mqtt adafruit-circuitpython-ads1x15 adafruit-circuitpython-ds3231 RPi.GPIO
+sudo apt-get update && sudo apt-get install -y python3-pip i2c-tools
+pip3 install --break-system-packages paho-mqtt adafruit-circuitpython-ads1x15 adafruit-circuitpython-ds3231 RPi.GPIO
 ```
 
-#### Langkah 2: Unduh Skrip & Salin Perintah Auto-Start on Boot
-1. Buka dashboard web di browser &rarr; masuk ke menu **Home**.
-2. Klik tombol **`📥 Unduh Skrip (.py)`** pada kartu ruangan (contoh: `pindad_node_ruang_server.py`).
-3. Salin file `.py` ke folder `/home/alex/` (atau `/home/pi/`) di Raspberry Pi.
-4. Salin dan jalankan **Perintah 1-Baris Auto-Start** di terminal SSH:
+#### Langkah B: Unduh Skrip Tailored & Jalankan Otomatis on Boot
+Jalankan perintah 1-baris berikut di terminal Raspberry Pi (sesuaikan `device_id` dan IP server):
 ```bash
-(crontab -l 2>/dev/null | grep -v 'pindad_node'; echo "@reboot sleep 10 && cd /home/alex && python3 -u /home/alex/pindad_node_xxxx.py > /home/alex/node.log 2>&1 &") | crontab - && nohup python3 -u /home/alex/pindad_node_xxxx.py > /home/alex/node.log 2>&1 &
+curl -sSL "http://192.168.196.236:8000/scripts/download/device?device_id=RPI3B_SERVER_INTERNET&broker_host=192.168.196.236" -o ~/pindad_node.py && (crontab -l 2>/dev/null | grep -v 'pindad_node'; echo "@reboot sleep 10 && python3 -u ~/pindad_node.py > ~/node.log 2>&1 &") | crontab - && nohup python3 -u ~/pindad_node.py > ~/node.log 2>&1 &
 ```
 
-#### Langkah 3: Verifikasi Log & Status Web
-Periksa log pengiriman telemetri secara live:
+#### Langkah C: Pantau Log Aktivitas Real-Time
 ```bash
-tail -f /home/alex/node.log
+tail -f ~/node.log
 ```
-Status perangkat di web dashboard akan langsung berubah menjadi **🟢 Online**.
 
 ---
 
-## 📑 Fitur Buku Panduan & SOP Teknis Cetak PDF
+## 📡 Protokol Komunikasi MQTT
 
-SIKOMAT menyediakan endpoint dokumen resmi yang dirancang dengan tata letak cetak A4 berstandar PT PINDAD (Persero).
-
-* **URL Akses:** `http://localhost:8000/panduan/pdf` (atau klik tombol **`📥 Unduh PDF Manual`** pada Modul 4).
-* **Fitur Dokumen:**
-  * Kop surat dan identitas dokumen kontrol resmi: `SOP/TI-PINDAD/AC/2026/V2.5`.
-  * Panduan lengkap 6 BAB (Arsitektur, Web Dashboard, Skema Wiring 1-8 Channel, Instalasi OS & Auto-start, Telegram Alert, Troubleshooting).
-  * Lembar pengesahan tanda tangan teknisi (**Dicky Akbar Syah Putra**) dan kepala divisi.
-  * Tombol **`Cetak / Simpan PDF (A4)`** yang teroptimasi otomatis (`@media print`).
-
----
-
-## 📡 Protokol Topik MQTT & Struktur Data
-
-### 1. Topik Telemetri (Uplink: Node $\rightarrow$ Server)
-* **Topik:** `pindad/devices/{device_id}/logs` atau `pindad/ac/logs`
-* **Contoh Payload JSON:**
+### 1. Topik Telemetri Uplink (Node → Server)
+* **Topik:** `pindad/devices/{DEVICE_ID}/telemetry`
+* **Format Payload JSON:**
 ```json
 {
-  "device_id": "RPI3B_SERVER_TELEPON",
-  "temperature": 24.5,
-  "ac1_current": 2.1874,
-  "ac2_current": 0.0000,
-  "total_current": 2.1874,
-  "watt_approx": 481.23,
-  "relay1": 1,
-  "relay2": 0,
-  "trigger_source": "schedule",
-  "recorded_at": "2026-09-03T11:00:00+07:00"
+  "device_id": "RPI3B_SERVER_INTERNET",
+  "active_ac": "AC_1_ON",
+  "ac_number": 1,
+  "state": "ON",
+  "current_ampere": 0.0211,
+  "watt": 5,
+  "recorded_at": "2026-09-24 08:15:00",
+  "turbo_active": false
 }
 ```
 
-### 2. Topik Kontrol Saklar (Downlink: Server $\rightarrow$ Node)
-* **Topik:** `pindad/devices/{device_id}/control`
-* **Contoh Payload JSON:**
+### 2. Topik Kontrol Downlink (Server → Node)
+* **Topik:** `pindad/devices/{DEVICE_ID}/control`
+* **Format Payload JSON:**
 ```json
 {
-  "device_id": "RPI3B_SERVER_TELEPON",
-  "relay": 1,
+  "device_id": "RPI3B_SERVER_INTERNET",
+  "ac": 1,
   "command": "ON",
-  "ac_number": 1,
   "state": "ON",
-  "source": "manual",
-  "timestamp": "2026-09-03T11:05:00+07:00"
+  "timestamp": "2026-09-24T08:15:00.000Z"
+}
+```
+
+### 3. Topik Sinkronisasi Jadwal (Server → Node)
+* **Topik:** `pindad/devices/{DEVICE_ID}/schedule`
+* **Format Payload JSON:**
+```json
+{
+  "device_id": "RPI3B_SERVER_INTERNET",
+  "server_time": "2026-09-24T08:15:00+07:00",
+  "schedules": [
+    {
+      "id": "66f2a89c...",
+      "label": "Shift Pagi",
+      "start_time": "07:00",
+      "end_time": "15:00",
+      "target_ac": "all",
+      "is_active": true
+    }
+  ]
 }
 ```
 
@@ -245,53 +249,74 @@ SIKOMAT menyediakan endpoint dokumen resmi yang dirancang dengan tata letak ceta
 ## 📁 Struktur Direktori Repositori
 
 ```text
-Dashboard/
+SIKOMAT/
 ├── app/
+│   ├── Console/Commands/
+│   │   ├── MqttPublisher.php           # Command uji publish MQTT
+│   │   └── MqttSubscriber.php          # Worker background penerima telemetri MQTT
 │   ├── Http/Controllers/
-│   │   ├── AuthController.php          # Autentikasi operator & user session
-│   │   └── DashboardController.php     # Controller Fleet, Telemetri, DevZone, Jadwal, PDF Manual
+│   │   ├── AcControlController.php     # Kontrol manual saklar AC & Virtual Pin
+│   │   ├── AuthController.php          # Autentikasi sesi staf & RBAC
+│   │   ├── DashboardController.php     # Controller utama modul Home & Fleet
+│   │   ├── ProfileSettingsController.php # Generator tailored skrip node Python
+│   │   ├── ScheduleController.php      # Manajemen jadwal shift & sync MQTT
+│   │   └── TelemetryLogController.php  # Riwayat log telemetri & ekspor CSV
 │   ├── Models/
-│   │   ├── AcLog.php                   # Model log telemetri arus & suhu
-│   │   ├── Device.php                  # Model instance perangkat ruangan
-│   │   ├── Template.php                # Model blueprint template hardware
-│   │   ├── Schedule.php                # Model jadwal shift rotasi RTC
-│   │   ├── SystemSetting.php           # Model pengaturan global (Telegram bot, alarm)
-│   │   └── User.php                    # Model akun pengguna operator
+│   │   ├── AcLog.php                   # Model log arus & watt telemetri
+│   │   ├── Device.php                  # Model data node ruangan (MongoDB)
+│   │   ├── Schedule.php                # Model aturan shift kerja RTC
+│   │   ├── SystemSetting.php           # Model konfigurasi Telegram & alarm
+│   │   └── Template.php                # Model blueprint template hardware
 │   └── Services/
-│       ├── MqttService.php             # Service publikasi & subscriber MQTT
-│       ├── TelegramService.php         # Service pengiriman notifikasi bot Telegram
-│       └── AnomalyDetectorService.php  # Service deteksi anomali AC 0 Ampere
+│       ├── AnomalyDetectorService.php  # Deteksi status AC Nyala / Mati berbasis arus
+│       ├── MqttService.php             # Handler koneksi broker MQTT
+│       ├── TelegramService.php         # Service bot alert Telegram
+│       └── WebSocketBroadcastService.php # WebSocket real-time broadcast
 ├── resources/
 │   └── views/
-│       ├── dashboard.blade.php         # Layout utama dashboard
-│       ├── panduan-pdf.blade.php       # Halaman Buku Panduan & SOP Cetak PDF A4
-│       └── partials/
-│           ├── section-home.blade.php  # Modul 1: Fleet Overview & Kontrol Ruangan
-│           ├── section-devzone.blade.php # Modul 2: Developer Zone (Template & Virtual Pin)
-│           ├── section-log.blade.php   # Modul 3: Riwayat Log Telemetri & Ekspor CSV
-│           ├── section-akun.blade.php  # Modul 4: SOP Panduan, Telegram Alert, Akun
-│           └── floating-nav.blade.php  # Navigasi melayang responsif mobile
+│       ├── dashboard.blade.php         # Template antarmuka utama SIKOMAT
+│       ├── panduan-pdf.blade.php       # Halaman cetak SOP & Buku Panduan A4
+│       └── partials/                   # Komponen modular antarmuka
+├── scripts/
+│   ├── node_config.json                # Template konfigurasi lokal node
+│   ├── pindad_universal_node.py        # Mesin IoT Universal Node (Python)
+│   └── setup_raspberry_pi.sh           # Shell script automasi dependensi Linux
 ├── routes/
-│   └── web.php                         # Definisi rute web, API AJAX, & PDF endpoint
-└── public/
-    └── SIKOMAT.png                     # Logo resmi SIKOMAT PT PINDAD
+│   └── web.php                         # Definisi rute web & API telemetri
+├── public/
+│   ├── SIKOMAT.png                     # Logo resmi SIKOMAT PT PINDAD
+│   └── dashboard_preview.png           # Tangkapan layar antarmuka dashboard
+└── README.md                           # Dokumentasi komprehensif proyek
 ```
+
+---
+
+## 📑 Buku Panduan & SOP Teknis Cetak PDF
+
+SIKOMAT menyediakan dokumen panduan resmi yang dirancang dengan tata letak cetak A4 berstandar PT PINDAD (PERSERO):
+
+* **URL Akses:** `http://localhost:8000/panduan/pdf` (atau klik tombol **`📥 Unduh PDF Manual`** pada Modul 4).
+* **Fitur Dokumen:**
+  - Nomor SOP Resmi: `SOP/TI-PINDAD/AC/2026/V2.6`.
+  - Panduan lengkap 6 BAB (Arsitektur Sistem, Pengoperasian Web, Wiring Hardware 1–8 Channel, Instalasi Node, Peringatan Telegram, dan Prosedur Troubleshooting).
+  - Lembar pengesahan tanda tangan teknisi (**Dicky Akbar Syah Putra**) dan pimpinan divisi terkait.
+  - Cetak otomatis teroptimasi `@media print` untuk disimpan langsung menjadi file PDF.
 
 ---
 
 ## 📝 Catatan Rilis & Changelog
 
-### Versi 2.5.0 (September 2026) - *Official SIKOMAT & PDF Manual Book Edition*
-* 🏷️ **Official SIKOMAT Logo Branding:** Integrasi logo resmi SIKOMAT pada header dashboard dan dokumen teknis.
-* 📑 **Buku Panduan & SOP Teknis Cetak PDF:** Penambahan halaman dan fitur download PDF (`/panduan/pdf`) berformat A4 lengkap 6 BAB.
-* 🔌 **Dukungan Pinout Relay Multi-Channel (1 s/d 8 Channel):** Dokumentasi dan generator skrip lengkap untuk relay 1, 2, 3, 4, hingga 8 channel.
-* 🤖 **Telegram Bot Emergency Alert:** Sistem peringatan dini otomatis ke grup Telegram teknisi saat AC anomali gagal hidup.
-* 📱 **Mobile UI & Alignment Polish:** Penataan lencana badge `SOP` dan `ALARM`, padding modal responsif `z-[60]`, dan keseragaman ukuran kartu Modul 4.
-* 👤 **Standardisasi Kredensial Operator:** Standardisasi nama operator resmi **Dicky Akbar Syah Putra** di seluruh sistem dan database.
+### Versi 2.6.0 (September 2026) - *Production Precision & Stability Edition*
+- 🎯 **True-RMS Zero-Suppression Sensing:** Penghapusan seluruh filter *deadband/noise floor cut-off*. Beban arus fisik murni ditampilkan apa adanya secara transparan (mendukung lampu panel 15–20 mA hingga kompresor AC besar).
+- 🛡️ **Anti-Flicker & Schedule Stability:** Penyempurnaan logika sinkronisasi jadwal MQTT (`force=False`). Penambahan/penghapusan jadwal tidak lagi memicu relai berkedip atau bergerak sendiri.
+- 🔒 **Graceful Schedule Deletion:** Menghapus jadwal shift tidak akan mematikan AC yang sedang menyala secara mendadak; status AC dialihkan dengan aman ke kontrol manual.
+- 📢 **Refactored Telegram Bot Alerts:** Menggantikan alarm panik dengan notifikasi perubahan status yang bersih: **AC MENYALA** (saat arus mengalir) dan **AC MATI** (saat arus terputus).
+- ⚡ **Non-Interactive System Clock Sync:** Penggunaan `sudo -n` untuk sinkronisasi waktu RTC ke sistem Linux agar skrip latar belakang tidak pernah tersuspensi (*SIGTTIN*).
+- 🖼️ **GitHub Showcase Polish:** Dokumentasi komprehensif lengkap dengan diagram arsitektur, tabel pinout, panduan satu baris instalasi, dan pratinjau tampilan dashboard.
 
 ---
 
 <p align="center">
   <b>Developed with ❤️ for PT PINDAD (PERSERO) • Divisi Mutu & Teknologi Informasi</b><br>
-  <i>Sistem Kontrol & Monitoring Otomatis AC (SIKOMAT) Berbasis IoT Terintegrasi</i>
+  <i>Sistem Informasi Kontrol & Monitoring Otomatis AC (SIKOMAT) Berbasis Industrial IoT</i>
 </p>

@@ -37,15 +37,22 @@ class AnomalyDetectorService
             }
         }
 
+        $minThreshold = (float)SystemSetting::get('anomaly_min_current', 0.005);
+        $cooldownMinutes = (int)SystemSetting::get('telegram_cooldown_minutes', 5);
+
+        // KETENTUAN MURNI: Kalau ada arus = AC NYALA, kalau tidak ada arus = AC MATI
+        $isCurrentFlowing = ($currentAmpere >= $minThreshold);
+        $currentStatus = $isCurrentFlowing ? 'NYALA' : 'MATI';
+
+        $cacheKeyStatus = "ac_state_status_{$deviceId}_{$acNumber}";
+        $cacheKeyCooldown = "ac_notif_cooldown_{$deviceId}_{$acNumber}";
         $cacheKeyFailure = "ac_failure_{$deviceId}_{$acNumber}";
-        $cacheKeyCooldown = "ac_alert_cooldown_{$deviceId}_{$acNumber}";
-        $isFailing = Cache::get($cacheKeyFailure, false);
-        $isCooldown = Cache::has($cacheKeyCooldown);
 
-        $cooldownMinutes = (int)SystemSetting::get('telegram_cooldown_minutes', 15);
+        $lastStatus = Cache::get($cacheKeyStatus, null);
+        $inCooldown = Cache::has($cacheKeyCooldown);
 
-        // CASE 1: ANOMALI GAGAL HIDUP (Saklar ON tapi Arus 0 Ampere)
-        if ($state === 'ON' && $currentAmpere < 0.15) {
+        // Update cache failure untuk dashboard visual warning jika saklar ON tapi AC MATI
+        if ($state === 'ON' && !$isCurrentFlowing) {
             Cache::forever($cacheKeyFailure, [
                 'device_id' => $deviceId,
                 'room_name' => $roomName,
@@ -53,72 +60,72 @@ class AnomalyDetectorService
                 'ac_number' => $acNumber,
                 'unit_name' => $unitName,
                 'current_ampere' => $currentAmpere,
-                'detected_at' => $recordedAt,
-                'status' => 'GAGAL_HIDUP',
+                'detected_at' => (string)$recordedAt,
+                'status' => 'AC_MATI_TANPA_ARUS',
             ]);
+        } else {
+            Cache::forget($cacheKeyFailure);
+        }
 
-            if (!$isCooldown) {
-                // Set cooldown timer
+        // Inisialisasi awal tanpa spam notifikasi saat node pertama kali terhubung
+        if ($lastStatus === null) {
+            Cache::forever($cacheKeyStatus, $currentStatus);
+            return [
+                'status' => $currentStatus,
+                'notif_sent' => false,
+                'reason' => 'initial_state'
+            ];
+        }
+
+        // HANYA kirim notifikasi jika TERJADI PERUBAHAN STATUS (Mati -> Nyala ATAU Nyala -> Mati)
+        if ($currentStatus !== $lastStatus) {
+            Cache::forever($cacheKeyStatus, $currentStatus);
+
+            if (!$inCooldown) {
                 Cache::put($cacheKeyCooldown, true, now()->addMinutes($cooldownMinutes));
 
-                // Send Telegram Emergency Alert
-                $res = $this->telegramService->sendFailureAlert(
-                    $roomName,
-                    $location,
-                    $deviceId,
-                    $acNumber,
-                    $unitName,
-                    $currentAmpere,
-                    $recordedAt,
-                    'Kompresor Mati / Beban Nol (0 A)'
-                );
+                if ($currentStatus === 'NYALA') {
+                    $res = $this->telegramService->sendAcOnNotification(
+                        $roomName,
+                        $location,
+                        $deviceId,
+                        $acNumber,
+                        $unitName,
+                        $currentAmpere,
+                        (string)$recordedAt
+                    );
+                    Log::info("[Notification] Sent AC NYALA notification to Telegram for {$deviceId} Unit {$acNumber}");
+                } else {
+                    $res = $this->telegramService->sendAcOffNotification(
+                        $roomName,
+                        $location,
+                        $deviceId,
+                        $acNumber,
+                        $unitName,
+                        $currentAmpere,
+                        (string)$recordedAt
+                    );
+                    Log::info("[Notification] Sent AC MATI notification to Telegram for {$deviceId} Unit {$acNumber}");
+                }
 
-                Log::warning("[AnomalyDetector] Sent Emergency Alert to Telegram for {$deviceId} Unit {$acNumber}");
                 return [
-                    'anomaly_detected' => true,
-                    'type' => 'GAGAL_HIDUP',
-                    'telegram_sent' => $res['success'] ?? false,
+                    'status' => $currentStatus,
+                    'notif_sent' => $res['success'] ?? false,
+                    'transition' => "{$lastStatus}_TO_{$currentStatus}",
                 ];
             }
 
             return [
-                'anomaly_detected' => true,
-                'type' => 'GAGAL_HIDUP',
-                'telegram_sent' => false,
+                'status' => $currentStatus,
+                'notif_sent' => false,
                 'reason' => 'in_cooldown',
             ];
         }
 
-        // CASE 2: PEMULIHAN SISTEM (Arus kembali normal saat ON)
-        if ($state === 'ON' && $currentAmpere >= 0.15 && $isFailing) {
-            Cache::forget($cacheKeyFailure);
-            Cache::forget($cacheKeyCooldown);
-
-            // Send Telegram Recovery Notification
-            $res = $this->telegramService->sendRecoveryAlert(
-                $roomName,
-                $location,
-                $deviceId,
-                $acNumber,
-                $unitName,
-                $currentAmpere,
-                $recordedAt
-            );
-
-            Log::info("[AnomalyDetector] Sent Recovery Alert to Telegram for {$deviceId} Unit {$acNumber}");
-            return [
-                'recovered' => true,
-                'telegram_sent' => $res['success'] ?? false,
-            ];
-        }
-
-        // CASE 3: NORMAL STANDBY (Saklar OFF dan Arus 0)
-        if ($state === 'OFF') {
-            Cache::forget($cacheKeyFailure);
-        }
-
         return [
-            'anomaly_detected' => false,
+            'status' => $currentStatus,
+            'notif_sent' => false,
+            'reason' => 'no_state_change',
         ];
     }
 

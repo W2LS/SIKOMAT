@@ -54,10 +54,15 @@ class TelemetryLogController extends Controller
 
         $normalizedActiveAc = "AC_{$uNum}_{$uState}";
         $currentAmpere = (float)($data['current_ampere'] ?? $request->input('current_ampere', 0.0));
+        $isBuffer = ($request->header('X-Pindad-Buffer') === '1');
         $recordedAt = isset($data['recorded_at']) ? Carbon::parse($data['recorded_at']) : now();
 
-        // Check if incoming telemetry is offline backlog (> 2 minutes old)
-        $isBacklog = abs(now()->diffInSeconds($recordedAt)) > 120;
+        // Jika request live tetapi jam RTC Raspberry Pi belum tersinkron (> 120s), gunakan waktu server sekarang
+        if (!$isBuffer && abs(now()->diffInSeconds($recordedAt)) > 120) {
+            $recordedAt = now();
+        }
+
+        $isBacklog = $isBuffer;
 
         // 1. Insert into AcLog (Preserve complete historic logging)
         $log = AcLog::create([
@@ -71,26 +76,27 @@ class TelemetryLogController extends Controller
 
         $dev = Device::where('device_id', $deviceId)->first();
 
-        // 2. Sync with Device current_values ONLY if live (NEVER let old backlog overwrite current switch states!)
-        if (!$isBacklog && $dev) {
-            $vals = $dev->current_values ?? [];
-            $numAc = max(1, (int)($dev->num_ac ?? 2));
-            $vals["V" . ($uNum - 1)] = ($uState === 'ON') ? 1 : 0;
-            $curPin = "V" . ($numAc + $uNum - 1);
-            $vals[$curPin] = ($uState === 'OFF') ? 0.0 : $currentAmpere;
-
-            // Recalculate combined wattage
-            $totalCur = 0.0;
-            for ($k = 1; $k <= $numAc; $k++) {
-                $kRelayOn = ($vals["V" . ($k - 1)] ?? 0) == 1;
-                $kCur = (float)($vals["V" . ($numAc + $k - 1)] ?? 0.0);
-                if (!$kRelayOn) $kCur = 0.0;
-                $totalCur += $kCur;
-            }
-            $vals["V" . ($numAc * 2)] = round($totalCur * 220);
-
+        // 2. Sync with Device current_values (Pastikan device langsung online jika live)
+        if ($dev) {
             $dev->status = 'online';
-            $dev->current_values = $vals;
+            if (!$isBacklog) {
+                $vals = $dev->current_values ?? [];
+                $numAc = max(1, (int)($dev->num_ac ?? 2));
+                $vals["V" . ($uNum - 1)] = ($uState === 'ON') ? 1 : 0;
+                $curPin = "V" . ($numAc + $uNum - 1);
+                $vals[$curPin] = ($uState === 'OFF') ? 0.0 : $currentAmpere;
+
+                // Recalculate combined wattage
+                $totalCur = 0.0;
+                for ($k = 1; $k <= $numAc; $k++) {
+                    $kRelayOn = ($vals["V" . ($k - 1)] ?? 0) == 1;
+                    $kCur = (float)($vals["V" . ($numAc + $k - 1)] ?? 0.0);
+                    if (!$kRelayOn) $kCur = 0.0;
+                    $totalCur += $kCur;
+                }
+                $vals["V" . ($numAc * 2)] = round($totalCur * 220);
+                $dev->current_values = $vals;
+            }
             $dev->save();
         }
 

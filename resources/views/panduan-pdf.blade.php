@@ -614,7 +614,7 @@
                         <div class="bg-white p-3 rounded-xl border border-amber-200 space-y-1">
                             <span class="font-black text-[#8E1616] block uppercase text-[10px]">Skenario 1: LAN Lokal / Uji Coba</span>
                             <p class="text-slate-600 leading-tight">
-                                Jika dashboard dijalankan pada laptop/PC teknisi, masukkan IP LAN laptop (misal: <code>192.168.196.98</code>).
+                                Jika dashboard dijalankan pada laptop/PC teknisi, masukkan IP LAN laptop (misal: <code>192.168.196.236</code>).
                             </p>
                         </div>
                         <div class="bg-white p-3 rounded-xl border border-amber-200 space-y-1">
@@ -648,7 +648,7 @@
                         Salin perintah 1-baris dari modal <b>`⚡ Setup Node`</b> dan jalankan langsung di terminal SSH Raspberry Pi:
                     </p>
                     <code class="block font-mono text-[10px] bg-black/70 text-emerald-400 p-3 rounded-xl select-all break-all leading-relaxed border border-white/10">
-                        pkill -9 -f python3 2>/dev/null; rm -f /home/alex/pindad_*.py /home/alex/node.log 2>/dev/null; curl -sSL "http://192.168.196.98:8000/scripts/download/device?device_id=RPI3B_SERVER_TELEPON&broker_host={{ $serverLanHost ?? "192.168.196.236" }}" -o /home/alex/pindad_node_rpi3b_server_telepon.py && (crontab -l 2>/dev/null | grep -v 'pindad'; echo "@reboot sleep 10 && cd /home/alex && python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &") | crontab - && nohup python3 -u /home/alex/pindad_node_rpi3b_server_telepon.py > /home/alex/node.log 2>&1 &
+                        sudo systemctl stop pindad* *telepon* 2>/dev/null; sudo pkill -9 -f 'server_telepon' 2>/dev/null; sudo pkill -9 -f 'pindad' 2>/dev/null; sudo pkill -9 -f python 2>/dev/null; (crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | crontab -; (sudo crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | sudo crontab - 2>/dev/null; sudo rm -f /etc/systemd/system/*pindad* /etc/systemd/system/*telepon* 2>/dev/null; sudo systemctl daemon-reload 2>/dev/null; rm -f ~/pindad_*.py ~/node_config.json ~/node.log 2>/dev/null; curl -sSL "http://192.168.196.236:8000/scripts/download/device?device_id=RPI3B_SERVER_INTERNET&broker_host={{ $serverLanHost ?? "192.168.196.236" }}" -o ~/pindad_node.py && (crontab -l 2>/dev/null | grep -v 'pindad_node'; echo "@reboot sleep 10 && python3 -u ~/pindad_node.py > ~/node.log 2>&1 &") | crontab - && nohup python3 -u ~/pindad_node.py > ~/node.log 2>&1 &
                     </code>
 
                     <!-- DEKONSTRUKSI ANATOMI PERINTAH -->
@@ -676,7 +676,7 @@
                         Untuk memverifikasi apakah pembacaan arus sensor dan telemetri berhasil terkirim ke dashboard:
                     </p>
                     <div class="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                        <code class="font-mono font-bold text-slate-800 text-xs">tail -f /home/alex/node.log</code>
+                        <code class="font-mono font-bold text-slate-800 text-xs">tail -f ~/node.log</code>
                         <span class="text-[10px] text-slate-400">Tekan Ctrl+C untuk keluar</span>
                     </div>
                     <div class="bg-slate-900 rounded-xl p-2.5 text-[10.5px] font-mono text-emerald-400 space-y-0.5 border border-slate-800">

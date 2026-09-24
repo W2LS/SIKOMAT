@@ -173,7 +173,11 @@ class ScheduleController extends Controller
 
             app(\App\Services\MqttService::class)->publish(
                 "pindad/devices/{$deviceId}/schedule",
-                json_encode(['device_id' => $deviceId, 'schedules' => $scheds])
+                json_encode([
+                    'device_id' => $deviceId,
+                    'server_time' => now()->toIso8601String(),
+                    'schedules' => $scheds
+                ])
             );
         } catch (\Throwable $e) {}
     }

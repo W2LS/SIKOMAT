@@ -19,7 +19,6 @@ import time
 import datetime
 import re
 import math
-import random
 import json
 import os
 import threading
@@ -32,7 +31,7 @@ try:
     HAS_PAHO = True
 except ImportError:
     HAS_PAHO = False
-    class DummyMQTTClient:
+    class OfflineMQTTStub:
         def __init__(self, *args, **kwargs): 
             self.on_connect = None
             self.on_message = None
@@ -41,11 +40,11 @@ except ImportError:
         def loop_stop(self): pass
         def publish(self, *args, **kwargs): pass
         def subscribe(self, *args, **kwargs): pass
-    class DummyMQTTModule:
-        Client = DummyMQTTClient
-    mqtt = DummyMQTTModule()
+    class OfflineMQTTModule:
+        Client = OfflineMQTTStub
+    mqtt = OfflineMQTTModule()
 
-# Hardware imports with simulation fallback for testing
+# Hardware imports for Raspberry Pi GPIO, I2C, RTC & ADC
 try:
     import board
     import busio
@@ -54,7 +53,7 @@ try:
     HAS_HARDWARE = True
 except ImportError:
     HAS_HARDWARE = False
-    print(" [NOTE] Berjalan di mode simulasi (RPi.GPIO / Adafruit library tidak ditemukan).")
+    print(" [NOTE] Berjalan di mode offline (RPi.GPIO / Adafruit library tidak ditemukan di PC host).")
 
 HAS_ADC_LIB = False
 ADS = None
@@ -90,6 +89,17 @@ def load_config():
         "telemetry_interval_seconds": 15,
         "compressor_min_off_seconds": 180
     }
+    # Deteksi apakah skrip ini adalah skrip tailored dari server khusus untuk device tertentu
+    is_tailored = default_config.get("device_id") != "RPI3B_PINDAD_ROOM_1"
+    if is_tailored:
+        # Selalu prioritaskan konfigurasi tailored dan perbarui node_config.json lokal
+        try:
+            with open(CONFIG_PATH, "w") as f:
+                json.dump(default_config, f, indent=2)
+        except Exception:
+            pass
+        return default_config
+
     if os.path.exists(CONFIG_PATH):
         try:
             with open(CONFIG_PATH, "r") as f:
@@ -115,6 +125,8 @@ RELAYS = config.get("relays", [])
 INTERVAL_SEC = config.get("telemetry_interval_seconds", 15)
 TURBO_COOLING_SEC = config.get("turbo_cooling_seconds", 0)
 MIN_OFF_TIME_SEC = config.get("compressor_min_off_seconds", 180)
+# Sebagian besar modul relay optocoupler Raspberry Pi berlogika ACTIVE-LOW (LOW = ON / Magnet Aktif, HIGH = OFF)
+RELAY_ACTIVE_LOW = bool(config.get("relay_active_low", True))
 
 print("=" * 70)
 print(f" [INIT] PINDAD IOT UNIVERSAL NODE CONTROLLER (ENTERPRISE IIOT)")
@@ -123,6 +135,7 @@ print(f" [ROOM]           : {config.get('room_name', 'N/A')}")
 print(f" [MQTT BROKER]    : {BROKER_HOST}:{BROKER_PORT}")
 print(f" [DASHBOARD HTTP] : {config.get('dashboard_http_url', 'Auto-Detect')}")
 print(f" [RELAY COUNT]    : {len(RELAYS)} Unit AC")
+print(f" [RELAY POLARITY] : {'ACTIVE-LOW (LOW=ON, HIGH=OFF) [Standar Modul Optocoupler]' if RELAY_ACTIVE_LOW else 'ACTIVE-HIGH (HIGH=ON, LOW=OFF)'}")
 print(f" [COMPRESSOR GUARD]: {MIN_OFF_TIME_SEC} Detik Anti-Short-Cycling Lockout")
 print("=" * 70)
 
@@ -131,7 +144,8 @@ class OfflineTelemetryBuffer:
     """Buffer lokal SQLite thread-safe untuk menjamin Zero Data Loss saat jaringan putus"""
     def __init__(self, db_path=None, max_records=50000):
         if db_path is None:
-            db_path = os.path.join(os.path.dirname(__file__), "pindad_offline_buffer.db")
+            clean_dev = re.sub(r'[^a-zA-Z0-9_]', '_', str(DEVICE_ID).lower())
+            db_path = os.path.join(os.path.dirname(__file__), f"pindad_offline_{clean_dev}.db")
         self.db_path = db_path
         self.max_records = max_records
         self.lock = threading.Lock()
@@ -232,9 +246,13 @@ if HAS_HARDWARE:
         for r in RELAYS:
             pin = r["gpio_pin"]
             GPIO.setup(pin, GPIO.OUT)
-            initial_val = GPIO.HIGH if r.get("initial_state", False) else GPIO.LOW
+            init_st = r.get("initial_state", False)
+            if RELAY_ACTIVE_LOW:
+                initial_val = GPIO.LOW if init_st else GPIO.HIGH
+            else:
+                initial_val = GPIO.HIGH if init_st else GPIO.LOW
             GPIO.output(pin, initial_val)
-            relay_states[r["ac_number"]] = r.get("initial_state", False)
+            relay_states[r["ac_number"]] = init_st
             if "tactile_pin" in r and r["tactile_pin"]:
                 t_pin = r["tactile_pin"]
                 GPIO.setup(t_pin, GPIO.OUT)
@@ -251,6 +269,10 @@ if HAS_HARDWARE:
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
             ads = ADS.ADS1115(i2c)
+            try:
+                ads.data_rate = 860  # Atur ke mode kecepatan tinggi 860 Samples Per Second
+            except Exception:
+                pass
             adc_pin_map = []
             if Pin is not None and hasattr(Pin, "A0"):
                 adc_pin_map = [Pin.A0, Pin.A1, Pin.A2, Pin.A3]
@@ -299,6 +321,11 @@ for r in RELAYS:
 def _execute_relay_hardware(ac_num, state_bool):
     """Eksekusi fisik saklar GPIO / Pulsa Taktil"""
     relay_states[ac_num] = state_bool
+    if not state_bool:
+        last_turned_off_timestamp[ac_num] = time.time()
+    else:
+        relay_turned_on_time[ac_num] = time.time()
+
     if HAS_GPIO or HAS_HARDWARE:
         try:
             r_info = next((r for r in RELAYS if r["ac_number"] == ac_num), None)
@@ -307,12 +334,17 @@ def _execute_relay_hardware(ac_num, state_bool):
                 is_tactile = r_info.get("mode", "LATCHING").upper() == "TACTILE"
                 if is_tactile:
                     duration = r_info.get("pulse_duration", 0.5)
-                    GPIO.output(pin, GPIO.HIGH)
+                    p_on = GPIO.LOW if RELAY_ACTIVE_LOW else GPIO.HIGH
+                    p_off = GPIO.HIGH if RELAY_ACTIVE_LOW else GPIO.LOW
+                    GPIO.output(pin, p_on)
                     time.sleep(duration)
-                    GPIO.output(pin, GPIO.LOW)
+                    GPIO.output(pin, p_off)
+                    print(f" [RELAY PULSA TAKTIL] AC {ac_num} -> Pulsa {duration}s terkirim (Pin GPIO {pin})")
                 else:
-                    GPIO.output(pin, GPIO.HIGH if state_bool else GPIO.LOW)
-                print(f" [RELAY FISIK BERHASIL] AC {ac_num} -> {'ON' if state_bool else 'OFF'} (Pin GPIO {pin})")
+                    target_lvl = (GPIO.LOW if state_bool else GPIO.HIGH) if RELAY_ACTIVE_LOW else (GPIO.HIGH if state_bool else GPIO.LOW)
+                    GPIO.output(pin, target_lvl)
+                    lvl_name = "LOW (Tegangan 0V / Koil Aktif)" if target_lvl == GPIO.LOW else "HIGH (Tegangan 3.3V / Koil Lepas)"
+                    print(f" [RELAY FISIK BERHASIL] AC {ac_num} -> {'ON (LAMPU HIDUP)' if state_bool else 'OFF (LAMPU MATI)'} [Pin GPIO {pin} = {lvl_name}]")
         except Exception as e:
             print(f" [RELAY GPIO ERROR] AC {ac_num}: {e}")
 
@@ -372,16 +404,25 @@ def switch_relay(ac_num, state_bool, bypass_guard=False):
     return True
 
 # ================= 5. HIGH-ACCURACY TRUE-RMS SAMPLING ACS712 + ADS1115 =================
-# Sensitivitas modul ACS712: 185 mV/A (05B), 100 mV/A (20A), 66 mV/A (30A)
-SENSITIVITAS_ACS712 = 0.185 # V/A
+# Sensitivitas modul ACS712: 185 mV/A (05B / 5A), 100 mV/A (20A), 66 mV/A (30A)
+acs_model = str(config.get("acs712_model", "5A")).upper()
+if "20" in acs_model:
+    SENSITIVITAS_ACS712 = 0.100  # 100 mV/A untuk modul ACS712 20A
+elif "30" in acs_model:
+    SENSITIVITAS_ACS712 = 0.066  # 66 mV/A untuk modul ACS712 30A
+else:
+    SENSITIVITAS_ACS712 = float(config.get("acs712_sensitivity", 0.185))  # 185 mV/A untuk ACS712 5A
+
 CALIBRATION_GAIN = float(config.get("calibration_gain_factor", 1.0))
 MOVING_AVG_WINDOW_SIZE = 3
 current_moving_avg_buffers = {r["ac_number"]: [] for r in RELAYS}
 
 def read_current_ampere(ac_num):
     """
-    Membaca arus listrik riil 100% presisi tinggi dari sensor fisik ACS712 via ADC ADS1115.
-    TANPA PEMBULATAN NOL BUATAN (Arus kecil seperti 0.0300A, 0.0500A tetap ditampilkan apa adanya secara akurat).
+    Membaca arus listrik riil 100% murni dari sensor fisik ACS712 via ADC ADS1115.
+    ZERO DUMMY - TANPA PEMOTONGAN AMBANG BATAS NOISE. Berapapun arus fisik yang terdeteksi
+    oleh sensor (kecil maupun besar) ditampilkan apa adanya secara transparan dan murni.
+    Saat relai mati (OFF), nilai dikembalikan murni 0.0000 A.
     """
     is_on = relay_states.get(ac_num, False)
     if not is_on:
@@ -395,22 +436,23 @@ def read_current_ampere(ac_num):
     if chan is not None and (HAS_ADC or HAS_HARDWARE):
         samples = []
         start_time = time.time()
-        # Sampling rapat selama 120ms (menangkap 6 siklus penuh gelombang sinus AC 50Hz)
-        while (time.time() - start_time) < 0.12:
+        last_err = None
+        # Sampling rapat selama 200ms (menangkap 10 siklus penuh gelombang sinus AC 50Hz)
+        while (time.time() - start_time) < 0.20:
             try:
                 samples.append(chan.voltage)
-            except Exception:
-                pass
+            except Exception as e:
+                last_err = e
 
-        if len(samples) >= 15:
-            # Hitung titik tengah quiescent tegangan DC sensor (tegangan nol referensi riil)
+        if len(samples) >= 3:
+            # Hitung titik tengah quiescent tegangan DC sensor (tegangan nol referensi riil ~2.4V - 2.5V)
             v_offset = sum(samples) / len(samples)
 
-            # Perhitungan True-RMS Digital Signal Processing: sqrt( sum((V - V_offset)^2) / N )
+            # Perhitungan True-RMS Digital Signal Processing murni: sqrt( sum((V - V_offset)^2) / N )
             sum_squared_diff = sum((v - v_offset) ** 2 for v in samples)
             v_rms = math.sqrt(sum_squared_diff / len(samples))
 
-            # Konversi tegangan RMS ke Arus RMS (Ampere) dengan faktor gain kalibrasi
+            # Konversi tegangan RMS ke Arus RMS murni murni tanpa potongan batas noise
             arus_instan = (v_rms / SENSITIVITAS_ACS712) * CALIBRATION_GAIN
 
             # Filter Moving Average adaptif untuk kestabilan pembacaan riil
@@ -420,11 +462,19 @@ def read_current_ampere(ac_num):
                 buf.pop(0)
             current_moving_avg_buffers[ac_num] = buf
             arus_fisik_riil = sum(buf) / len(buf)
+
+            # Diagnostik transparan ke log terminal untuk verifikasi sensor fisik
+            print(f" [ADC SENSOR AC {ac_num}] {len(samples)} sampel | V_DC: {v_offset:.3f}V | V_RMS: {v_rms:.4f}V | Arus Terhitung: {arus_fisik_riil:.4f} A")
+        else:
+            err_msg = f" (Error: {last_err})" if last_err else ""
+            print(f" [ADC WARNING AC {ac_num}] Jumlah sampel terlalu sedikit ({len(samples)} sampel){err_msg}. Periksa jalur I2C ADS1115.")
     else:
-        # Jika hardware tidak terpasang -> Murni 0.0000 A
+        if not HAS_ADC:
+            print(f" [ADC NOTICE AC {ac_num}] Modul ADC ADS1115 belum aktif atau tidak terdeteksi di alamat I2C 0x48.")
+        elif chan is None:
+            print(f" [ADC NOTICE AC {ac_num}] Channel ADC ADS1115 untuk AC {ac_num} belum terdaftar di adc_channels.")
         arus_fisik_riil = 0.0000
 
-    # Mengembalikan nilai arus fisik murni dengan presisi 4 desimal tanpa deadband suppression
     if arus_fisik_riil > 0.0000:
         return round(arus_fisik_riil, 4)
 
@@ -485,35 +535,56 @@ def evaluate_schedules(force=False):
     global relay_states, manual_override, is_turbo_cooling_active, last_active_schedule_map
     if is_turbo_cooling_active:
         return
+
+    # JIKA TIDAK ADA JADWAL AKTIF (Seluruh jadwal kosong / dihapus):
+    # Mode manual murni. Jangan sentuh relai, jangan jalankan rotasi bayangan.
+    # Pertahankan status saklar dan relai AC apa adanya.
+    if not active_schedules:
+        for r in RELAYS:
+            u = r["ac_number"]
+            last_active_schedule_map[u] = None
+        return
+
+    all_sch_ids = [s.get("id") for s in active_schedules if s.get("id")]
     now_hm = get_current_time_hm()
+
     for r in RELAYS:
         ac_num = r["ac_number"]
         matching_sch = [s for s in active_schedules if is_schedule_active_for_ac(s, ac_num, now_hm)]
         active_sch_id = matching_sch[0].get("id") if matching_sch else None
-
-        # Reset manual override otomatis ketika shift baru dimulai
         prev_sch_id = last_active_schedule_map.get(ac_num)
-        if active_sch_id != prev_sch_id:
-            last_active_schedule_map[ac_num] = active_sch_id
-            manual_override[ac_num] = False
 
+        # Kasus A: Shift baru yang terjadwal dimulai sekarang
+        if active_sch_id != prev_sch_id and active_sch_id is not None:
+            last_active_schedule_map[ac_num] = active_sch_id
+            manual_override[ac_num] = False  # Masuk ke jadwal baru -> reset manual override
+
+        # Kasus B: Shift sebelumnya berakhir
+        elif active_sch_id is None and prev_sch_id is not None:
+            last_active_schedule_map[ac_num] = None
+            # Jika jadwal sebelumnya tidak ada lagi di daftar (DIHAPUS oleh user),
+            # pertahankan status AC tetap menyala (beralih ke kontrol manual) agar AC tidak mati mendadak
+            if prev_sch_id not in all_sch_ids:
+                manual_override[ac_num] = True
+                continue
+            else:
+                # Jadwal masih ada di daftar, namun jam operasional shift telah berakhir
+                manual_override[ac_num] = False
+
+        # Jika sedang dalam mode override manual (pengguna baru saja menekan saklar di web),
+        # hormati pilihan pengguna dan jangan ubah status AC
         if manual_override.get(ac_num, False) and not force:
             continue
 
-        should_be_on = len(matching_sch) > 0
-        if not active_schedules:
-            # Default 12-Hour Shift (Rotasi Otomatis Siang/Malam)
-            dt = get_current_datetime()
-            hour = dt.hour
-            if ac_num == 1:
-                should_be_on = (6 <= hour < 18)
-            elif ac_num == 2:
-                should_be_on = not (6 <= hour < 18)
+        should_be_on = (len(matching_sch) > 0)
 
-        if relay_states.get(ac_num) != should_be_on or force:
+        # HANYA eksekusi hardware jika status relay memang perlu diubah!
+        # Mencegah relai terpicu ulang atau saklar dashboard berkedip sendiri
+        if relay_states.get(ac_num) != should_be_on:
             sch_desc = f"Aturan '{matching_sch[0].get('label', 'Jadwal')}'" if should_be_on and matching_sch else "Luar Jam Kerja"
             print(f" [RTC OTOMASI SHIFT] AC {ac_num} -> {'ON' if should_be_on else 'OFF'} (Waktu RTC: {now_hm} | {sch_desc})")
-            switch_relay(ac_num, should_be_on)
+            _execute_relay_hardware(ac_num, should_be_on)
+            send_instant_telemetry(ac_num)
 
 # ================= 7. TELEMETRI, DUAL-SYNC & STORE-AND-FORWARD =================
 last_telegram_alert = {}
@@ -572,7 +643,7 @@ def drain_offline_buffer(dash_url):
             req = urllib.request.Request(
                 f"{dash_url}/api/telemetry",
                 data=payload_str.encode('utf-8'),
-                headers={'Content-Type': 'application/json', 'User-Agent': 'PindadIoTNode/1.0'}
+                headers={'Content-Type': 'application/json', 'User-Agent': 'PindadIoTNode/1.0', 'X-Pindad-Buffer': '1'}
             )
             with urllib.request.urlopen(req, timeout=2) as resp:
                 if resp.getcode() == 200:
@@ -603,17 +674,24 @@ def send_http_telemetry(payload):
                 resp_json = json.loads(resp_bytes.decode('utf-8'))
                 if "telegram" in resp_json and isinstance(resp_json["telegram"], dict):
                     config["telegram"] = resp_json["telegram"]
-                if "server_time" in resp_json and 'rtc_device' in globals() and rtc_device:
+                if "server_time" in resp_json:
                     try:
                         srv_str = resp_json["server_time"]
-                        srv_dt = datetime.datetime.fromisoformat(srv_str)
+                        clean_str = srv_str[:19].replace("T", " ")
+                        srv_dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
                         cur_rtc = get_current_datetime()
-                        if abs((srv_dt - cur_rtc).total_seconds()) > 60:
-                            import time as _t
-                            rtc_device.datetime = _t.struct_time((srv_dt.year, srv_dt.month, srv_dt.day, srv_dt.hour, srv_dt.minute, srv_dt.second, srv_dt.weekday(), -1, -1))
-                            print(f" [RTC HARDWARE SYNC] Jam DS3231 berhasil disinkronkan ke waktu Server: {srv_dt.strftime('%Y-%m-%d %H:%M:%S')}")
-                    except Exception:
-                        pass
+                        diff_sec = abs((srv_dt - cur_rtc).total_seconds())
+                        if diff_sec > 10:
+                            if 'rtc_device' in globals() and rtc_device:
+                                try:
+                                    rtc_device.datetime = srv_dt.timetuple()
+                                    print(f" [RTC HARDWARE SYNC] Jam DS3231 berhasil disinkronkan ke waktu Server: {srv_dt.strftime('%Y-%m-%d %H:%M:%S')} (Koreksi selisih {int(diff_sec)}s)")
+                                except Exception as _err_rtc:
+                                    print(f" [RTC HARDWARE SYNC WARNING] Gagal set DS3231: {_err_rtc}")
+                            os.system(f"sudo -n date -s '{srv_dt.strftime('%Y-%m-%d %H:%M:%S')}' 2>/dev/null")
+                            evaluate_schedules(force=True)
+                    except Exception as _e_sync:
+                        print(f" [SERVER TIME SYNC ERROR] {_e_sync}")
 
                 if "schedules" in resp_json and isinstance(resp_json["schedules"], list):
                     new_scheds = resp_json["schedules"]
@@ -659,10 +737,11 @@ def send_instant_telemetry(target_ac_num=None):
         print(f" [INSTANT TELEMETRY ERROR] {e}")
 
 # ================= 8. MQTT CLIENT & HANDLERS =================
+client_id_ktp = f"PINDAD_NODE_{DEVICE_ID}"
 try:
-    local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=f"PINDAD_NODE_{DEVICE_ID}_{random.randint(100,999)}")
+    local_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=client_id_ktp)
 except Exception:
-    local_client = mqtt.Client(client_id=f"PINDAD_NODE_{DEVICE_ID}_{random.randint(100,999)}")
+    local_client = mqtt.Client(client_id=client_id_ktp)
 
 def on_local_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
@@ -714,6 +793,22 @@ def on_local_message(client, userdata, msg):
         # Jadwal Otomatis Sync via MQTT Topic (Instant Real-time push)
         if topic.endswith("/schedule") or topic.endswith("schedule"):
             try:
+                if isinstance(data, dict) and "server_time" in data:
+                    try:
+                        clean_str = data["server_time"][:19].replace("T", " ")
+                        srv_dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+                        cur_rtc = get_current_datetime()
+                        diff_sec = abs((srv_dt - cur_rtc).total_seconds())
+                        if diff_sec > 10:
+                            if 'rtc_device' in globals() and rtc_device:
+                                try:
+                                    rtc_device.datetime = srv_dt.timetuple()
+                                    print(f" [MQTT RTC SYNC] Jam DS3231 disinkronkan via MQTT: {srv_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                                except Exception:
+                                    pass
+                            os.system(f"sudo -n date -s '{srv_dt.strftime('%Y-%m-%d %H:%M:%S')}' 2>/dev/null")
+                    except Exception:
+                        pass
                 new_scheds = []
                 if isinstance(data, dict):
                     if "schedules" in data and isinstance(data["schedules"], list):
@@ -732,7 +827,7 @@ def on_local_message(client, userdata, msg):
                             json.dump(config, f, indent=2)
                     except Exception:
                         pass
-                    evaluate_schedules(force=True)
+                    evaluate_schedules(force=False)
             except Exception as ex:
                 print(f" [MQTT JADWAL ERROR] {ex}")
             return
@@ -750,15 +845,12 @@ def on_local_message(client, userdata, msg):
             send_instant_telemetry()
             return
 
-        # Single AC toggle
+        # Single AC toggle (Selalu eksekusi fisik hardware pin tanpa skip)
         if cmd in ["ON", "OFF"]:
             target_st = (cmd == "ON")
-            current_st = relay_states.get(ac_num, False)
-            if current_st == target_st:
-                print(f" [MQTT SKIPPED] AC {ac_num} sudah berstatus {'ON' if target_st else 'OFF'}. Mengabaikan perintah duplikat.")
-                return
             manual_override[ac_num] = True
             _execute_relay_hardware(ac_num, target_st)
+            print(f" [MANUAL WEB SAKLAR] AC {ac_num} diperintahkan {'ON' if target_st else 'OFF'} oleh pengguna (Pin fisik dipicu).")
             send_instant_telemetry(ac_num)
         elif cmd in ["AC_1_ON", "AC_1_OFF", "AC_2_ON", "AC_2_OFF"]:
             parts = cmd.split("_")
@@ -766,6 +858,7 @@ def on_local_message(client, userdata, msg):
             state = (parts[2] == "ON")
             manual_override[ac_num] = True
             _execute_relay_hardware(ac_num, state)
+            print(f" [MANUAL WEB SAKLAR] AC {ac_num} diperintahkan {'ON' if state else 'OFF'} oleh pengguna.")
             send_instant_telemetry(ac_num)
         elif cmd.startswith("AC_"):
             parts = cmd.split("_")
@@ -774,6 +867,7 @@ def on_local_message(client, userdata, msg):
                 st = (parts[2].upper() == "ON")
                 manual_override[ac_num] = True
                 _execute_relay_hardware(ac_num, st)
+                print(f" [MANUAL WEB SAKLAR] AC {ac_num} diperintahkan {'ON' if st else 'OFF'} oleh pengguna.")
                 send_instant_telemetry(ac_num)
     except Exception as e:
         print(f" [MQTT MSG ERROR] {e}")
@@ -781,11 +875,52 @@ def on_local_message(client, userdata, msg):
 local_client.on_connect = on_local_connect
 local_client.on_message = on_local_message
 
+def initial_server_sync():
+    """Sinkronisasi awal waktu server & jadwal shift seketika saat node booting"""
+    global active_schedules
+    dash_url = config.get("dashboard_http_url")
+    if not dash_url:
+        return
+    try:
+        req_data = json.dumps({
+            "device_id": DEVICE_ID,
+            "boot_sync": True,
+            "state": "BOOT",
+            "current_ampere": 0.0,
+            "watt": 0
+        }).encode('utf-8')
+        req = urllib.request.Request(
+            f"{dash_url}/api/telemetry",
+            data=req_data,
+            headers={'Content-Type': 'application/json', 'User-Agent': 'PindadIoTNode/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            resp_bytes = resp.read()
+            if resp_bytes:
+                resp_json = json.loads(resp_bytes.decode('utf-8'))
+                if "server_time" in resp_json:
+                    clean_str = resp_json["server_time"][:19].replace("T", " ")
+                    srv_dt = datetime.datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+                    if 'rtc_device' in globals() and rtc_device:
+                        try:
+                            rtc_device.datetime = srv_dt.timetuple()
+                            print(f" [BOOT SYNC] Jam DS3231 berhasil disinkronkan ke waktu Server: {srv_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                        except Exception as _e_boot:
+                            print(f" [BOOT SYNC WARNING] {_e_boot}")
+                    os.system(f"sudo -n date -s '{srv_dt.strftime('%Y-%m-%d %H:%M:%S')}' 2>/dev/null")
+                if "schedules" in resp_json and isinstance(resp_json["schedules"], list):
+                    active_schedules = resp_json["schedules"]
+                    config["schedules"] = resp_json["schedules"]
+                    print(f" [BOOT SYNC] {len(active_schedules)} jadwal shift aktif termuat dari Server!")
+    except Exception as e:
+        print(f" [BOOT SYNC NOTICE] Sync awal via HTTP: {e}")
+
 # ================= 9. MAIN TELEMETRY LOOP =================
 def telemetry_loop():
     global is_turbo_cooling_active
     start_time = time.time()
 
+    initial_server_sync()
     evaluate_schedules(force=True)
 
     while True:
@@ -814,16 +949,13 @@ def telemetry_loop():
                     "turbo_active": is_turbo_cooling_active
                 }
 
-                # 1. Publish ke MQTT
-                local_client.publish("pindad/ac/logs", json.dumps(payload))
+                # 1. Publish ke MQTT (Hanya ke Saluran / Topik Pribadi Perangkat)
                 local_client.publish(f"pindad/devices/{DEVICE_ID}/telemetry", json.dumps(payload))
 
                 # 2. Dual-Sync HTTP REST dengan Offline Buffer
                 send_http_telemetry(payload)
 
-                # 3. Direct Edge Anomaly Alert (Telegram)
-                if is_on and current_amp < 0.05 and not is_turbo_cooling_active:
-                    send_direct_telegram_alert(ac_num, r.get('name', f'AC {ac_num}'), current_amp, 'GAGAL_HIDUP')
+                # 3. Direct Edge Alert ditangani terpusat oleh Server AnomalyDetectorService (AC Nyala / AC Mati murni berbasis arus)
 
                 buf_count = offline_buffer.get_count()
                 buf_info = f" | [Buffer Offline: {buf_count} item]" if buf_count > 0 else ""

@@ -14,14 +14,15 @@ function homeFleetComponent() {
         modalRequestDevice: false,
         rpiSetupData: { name: '', device_id: '', script_name: '', download_url: '', command: '' },
         copySuccess: false,
+        copyDepSuccess: false,
         editDeviceData: { id: '', name: '', template_id: '', location: '', device_id: '', ip_address: '', num_ac: 2 },
         editScheduleData: { id: '', label: '', target_ac: 'all', start_time: '06:00', end_time: '18:00', is_active: true },
         openRpiSetup(dev) {
             const cleanId = (dev.device_id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
             const scriptName = 'pindad_node_' + cleanId + '.py';
-            let serverHost = '{{ $serverLanHost ?? '' }}' || window.location.hostname || '192.168.196.98';
+            let serverHost = '{{ $serverLanHost ?? '' }}' || window.location.hostname || '192.168.196.236';
             if (serverHost === '127.0.0.1' || serverHost === 'localhost') {
-                serverHost = '192.168.196.98';
+                serverHost = '192.168.196.236';
             }
             const serverPort = window.location.port ? (':' + window.location.port) : ':8000';
             
@@ -40,16 +41,31 @@ function homeFleetComponent() {
             this.modalRpiSetup = true;
         },
         updateRpiSetupUrls() {
-            const cleanId = (this.rpiSetupData.device_id || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
-            const scriptName = 'pindad_node_' + cleanId + '.py';
-            const host = (this.rpiSetupData.server_host || '192.168.196.98').trim();
+            const scriptName = 'pindad_node.py';
+            const host = (this.rpiSetupData.server_host || '192.168.196.236').trim();
             const port = this.rpiSetupData.server_port || (window.location.port ? (':' + window.location.port) : ':8000');
             const proto = window.location.protocol || 'http:';
             const downloadUrl = `${proto}//${host}${port}/scripts/download/device?device_id=${encodeURIComponent(this.rpiSetupData.device_id || '')}&broker_host=${host}`;
+            const depUrl = `${proto}//${host}${port}/scripts/download/setup_raspberry_pi.sh`;
             
             this.rpiSetupData.script_name = scriptName;
             this.rpiSetupData.download_url = downloadUrl;
-            this.rpiSetupData.command = `pkill -9 -f python3 2>/dev/null; rm -f /home/alex/pindad_*.py /home/alex/node.log 2>/dev/null; curl -sSL "${downloadUrl}" -o /home/alex/${scriptName} && (crontab -l 2>/dev/null | grep -v 'pindad'; echo "@reboot sleep 10 && cd /home/alex && python3 -u /home/alex/${scriptName} > /home/alex/node.log 2>&1 &") | crontab - && nohup python3 -u /home/alex/${scriptName} > /home/alex/node.log 2>&1 &`;
+            this.rpiSetupData.dep_url = depUrl;
+            this.rpiSetupData.dep_command = `curl -sSL "${depUrl}" | bash`;
+            this.rpiSetupData.command = `sudo systemctl stop pindad* *telepon* 2>/dev/null; sudo pkill -9 -f 'server_telepon' 2>/dev/null; sudo pkill -9 -f 'pindad' 2>/dev/null; sudo pkill -9 -f python 2>/dev/null; (crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | crontab -; (sudo crontab -l 2>/dev/null | grep -v -E 'pindad|telepon|python') | sudo crontab - 2>/dev/null; sudo rm -f /etc/systemd/system/*pindad* /etc/systemd/system/*telepon* 2>/dev/null; sudo systemctl daemon-reload 2>/dev/null; rm -f ~/pindad_*.py ~/node_config.json ~/node.log 2>/dev/null; curl -sSL "${downloadUrl}" -o ~/pindad_node.py && (crontab -l 2>/dev/null | grep -v 'pindad_node'; echo "@reboot sleep 10 && python3 -u ~/pindad_node.py > ~/node.log 2>&1 &") | crontab - && nohup python3 -u ~/pindad_node.py > ~/node.log 2>&1 &`;
+        },
+        copyDepCommand() {
+            const text = this.rpiSetupData.dep_command;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    this.copyDepSuccess = true;
+                    setTimeout(() => { this.copyDepSuccess = false; }, 3000);
+                }).catch(() => {
+                    this.fallbackCopy(text);
+                });
+            } else {
+                this.fallbackCopy(text);
+            }
         },
         copyCommand() {
             const text = this.rpiSetupData.command;
@@ -1220,11 +1236,32 @@ function homeFleetComponent() {
                     <input type="text" 
                            x-model="rpiSetupData.server_host" 
                            @input="updateRpiSetupUrls()"
-                           placeholder="Contoh: 192.168.196.98" 
+                           placeholder="Contoh: 192.168.196.236" 
                            class="w-full px-3.5 py-2 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border border-slate-200 text-xs sm:text-sm font-mono font-bold text-slate-800 bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-amber-500 outline-none transition">
                     <p class="text-[10.5px] text-slate-500 font-medium leading-tight mt-1.5 flex items-start gap-1">
                         <span>💡</span>
                         <span>Dapat diedit jika ganti IP LAN atau sudah dideploy ke domain server. Perintah cURL otomatis menyesuaikan.</span>
+                    </p>
+                </div>
+
+                <!-- STEP 1 (KHUSUS RASPBERRY PI BARU): INSTALL DEPENDENSI & HARDWARE I2C -->
+                <div class="bg-amber-50 rounded-2xl p-3 sm:p-3.5 border border-amber-200/80 space-y-2 text-slate-800">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                            <span>📦 1. Pasang Dependensi & I2C (Khusus Raspi Baru)</span>
+                        </span>
+                        <button @click="copyDepCommand()" 
+                                type="button" 
+                                class="px-2.5 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider transition flex items-center gap-1 cursor-pointer active:scale-95 shrink-0 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 shadow-2xs">
+                            <span x-text="copyDepSuccess ? '✓' : '📋'"></span>
+                            <span x-text="copyDepSuccess ? 'Tersalin!' : 'Salin Perintah'"></span>
+                        </button>
+                    </div>
+                    <div class="bg-black/90 rounded-xl p-2 sm:p-2.5 border border-amber-300/40 font-mono text-[9.5px] sm:text-[10.5px] text-amber-300 break-all select-all"
+                         x-text="rpiSetupData.dep_command">
+                    </div>
+                    <p class="text-[10px] text-slate-500 leading-tight">
+                        💡 Jalankan sekali pada Raspberry Pi baru untuk mengaktifkan antarmuka I2C dan menginstall library sensor (paho-mqtt, adafruit ads1115 & ds3231).
                     </p>
                 </div>
 
@@ -1257,7 +1294,7 @@ function homeFleetComponent() {
                     <!-- Kolom 1: Cek Log -->
                     <div class="bg-slate-50 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 border border-slate-200 space-y-1">
                         <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">Periksa Log Real-Time</span>
-                        <code class="font-mono text-[10px] sm:text-[10.5px] font-bold text-slate-800 block bg-white px-2 py-1 rounded-lg border border-slate-200 select-all truncate">tail -f /home/alex/node.log</code>
+                        <code class="font-mono text-[10px] sm:text-[10.5px] font-bold text-slate-800 block bg-white px-2 py-1 rounded-lg border border-slate-200 select-all truncate">tail -f ~/node.log</code>
                     </div>
 
                     <!-- Kolom 2: Unduh Manual -->
